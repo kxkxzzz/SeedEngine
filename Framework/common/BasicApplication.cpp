@@ -1,0 +1,17 @@
+#include "BasicApplication.hpp"
+
+int kx::BasicApplication::Initialize() {
+    m_quitting = false;
+
+    return 0;
+}
+
+void kx::BasicApplication::Shutdown() {
+}
+
+void kx::BasicApplication::Tick() {
+}
+
+bool kx::BasicApplication::IsQuitting() {
+    return m_quitting;
+}

@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <iostream>
 #include "IApplication.hpp"
 
 namespace kx {
@@ -7,14 +7,11 @@ extern IApplication* g_pApp;
 using namespace kx;
 
 int main(int argc, char** argv) {
-    if (kx::g_pApp == nullptr) {
-        printf("Application instance is null!\n");
-        return -1;
-    }
+    int ret;
 
-    if (kx::g_pApp->Initialize() != 0) {
-        printf("Failed to initialize application!\n");
-        return -1;
+    if ((ret = kx::g_pApp->Initialize()) != 0) {
+        std::cout << "Application Initialize failed: " << ret << std::endl;
+        return ret;
     }
 
     while (!kx::g_pApp->IsQuitting()) {

@@ -1,3 +1,4 @@
+#include <iostream>
 #include "BasicApplication.hpp"
 
 int kx::BasicApplication::Initialize() {
@@ -10,6 +11,7 @@ void kx::BasicApplication::Shutdown() {
 }
 
 void kx::BasicApplication::Tick() {
+    std::cout << "BasicTick" << std::endl;
 }
 
 bool kx::BasicApplication::IsQuitting() {

@@ -127,7 +127,7 @@ DisableFormat: false
 # 自动检测函数的调用和定义是否被格式为每行一个参数(Experimental)
 ExperimentalAutoDetectBinPacking: false
 # 修正命名空间注释
-FixNamespaceComments: false
+FixNamespaceComments: true
 # 需要被解读为foreach循环而不是函数调用的宏
 ForEachMacros:
 - foreach

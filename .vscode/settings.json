@@ -1,4 +1,0 @@
-{
-    "clang-format.executable": "clang-format",
-    "clang-format.fallbackStyle": "LLVM"
-}

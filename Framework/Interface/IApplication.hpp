@@ -1,3 +1,4 @@
+// IApplication.hpp
 #pragma once
 
 #include "Interface.hpp"

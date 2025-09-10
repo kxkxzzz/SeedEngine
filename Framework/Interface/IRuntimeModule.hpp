@@ -1,3 +1,4 @@
+// IRuntimeModule.hpp
 #pragma once
 
 #include "Interface.hpp"
@@ -9,4 +10,4 @@ public:
     virtual void Tick() = 0;
     virtual void Shutdown() = 0;
 };
-}
+}  // namespace kx

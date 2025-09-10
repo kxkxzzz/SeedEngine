@@ -1,3 +1,4 @@
+// EmptyApplication.cpp
 #include "BasicApplication.hpp"
 
 namespace kx {

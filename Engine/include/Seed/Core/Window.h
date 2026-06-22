@@ -2,10 +2,15 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 
+#include "Seed/Events/Event.h"
+
 namespace seed {
+
+using EventCallbackFn = std::function<void(Event&)>;
 
 struct WindowCreateInfo {
     std::string_view title = "SeedEngine";
@@ -28,6 +33,9 @@ public:
 
     // 工厂：根据平台返回具体实现（当前固定为 GLFWWindow）
     static Window* Create(const WindowCreateInfo& info);
+
+    // 事件回调：由 Application 设置，GLFW 回调触发后上抛给 Application
+    virtual void SetEventCallback(const EventCallbackFn& callback) = 0;
 
     // 事件处理
     virtual void PollEvents() = 0;

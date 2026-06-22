@@ -4,6 +4,8 @@
 #include <memory>
 
 #include "Seed/Core/Window.h"
+#include "Seed/Events/Event.h"
+#include "Seed/Events/WindowEvent.h"
 
 namespace seed {
 
@@ -18,11 +20,15 @@ public:
     // 主循环：每帧 PollEvents -> 清屏 -> SwapBuffers，直到窗口关闭
     void Run();
 
+    void OnEvent(Event& e);
+
     Window& GetWindow() { return *m_window; }
 
     static Application& Get() { return *s_instance; }
 
 private:
+    bool OnWindowClose(WindowCloseEvent& e);
+
     std::unique_ptr<Window> m_window;
     bool m_running = true;
 

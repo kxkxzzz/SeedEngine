@@ -14,14 +14,18 @@ public:
     explicit GLFWWindow(const WindowCreateInfo& info);
     ~GLFWWindow() override;
 
+    void SetEventCallback(const EventCallbackFn& callback) override {
+        m_data.EventCallback = callback;
+    }
+
     void PollEvents() override;
     bool ShouldClose() override;
     void SwapBuffers() override;
 
     void* GetNativeWindow() const override { return m_window; }
-    uint32_t GetWidth() const override { return m_width; }
-    uint32_t GetHeight() const override { return m_height; }
-    std::string_view GetTitle() const override { return m_title; }
+    uint32_t GetWidth() const override { return m_data.Width; }
+    uint32_t GetHeight() const override { return m_data.Height; }
+    std::string_view GetTitle() const override { return m_data.Title; }
     bool IsResizable() const override { return m_resizable; }
     bool IsFullscreen() const override { return m_fullscreen; }
 
@@ -36,11 +40,22 @@ private:
 
     static void OnFramebufferResize(GLFWwindow* window, int width, int height);
     static void OnWindowClose(GLFWwindow* window);
+    static void OnKey(GLFWwindow* window, int key, int scancode, int action, int mods);
+    static void OnChar(GLFWwindow* window, unsigned int codepoint);
+    static void OnMouseButton(GLFWwindow* window, int button, int action, int mods);
+    static void OnCursorPos(GLFWwindow* window, double xPos, double yPos);
+    static void OnScroll(GLFWwindow* window, double xOffset, double yOffset);
+
+    // 传给 glfwSetWindowUserPointer 的数据包
+    // 静态回调里只需访问这些数据，不需要整个 GLFWWindow 对象
+    struct WindowData {
+        std::string Title;
+        uint32_t Width = 0, Height = 0;
+        EventCallbackFn EventCallback;
+    };
 
     GLFWwindow* m_window = nullptr;
-    uint32_t m_width = 0;
-    uint32_t m_height = 0;
-    std::string m_title;
+    WindowData m_data;
     bool m_resizable = true;
     bool m_fullscreen = false;
 

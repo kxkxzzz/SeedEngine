@@ -5,7 +5,7 @@
 
 namespace seed {
 
-// 阶段 A：暂不加自定义逻辑，仅依赖引擎开窗 + 清屏。
+// 阶段 A：暂不加自定义逻辑，仅依赖引擎开窗 + 清屏
 class Sandbox : public Application {
 public:
     Sandbox() { SEED_INFO("Sandbox 客户端已创建"); }

@@ -10,7 +10,7 @@ namespace seed {
 
 int GLFWWindow::s_glfwWindowCount = 0;
 
-// Window::Create 工厂在此实现：当前平台固定返回 GLFW 实现。
+// Window::Create 工厂在此实现：当前平台固定返回 GLFW 实现
 Window* Window::Create(const WindowCreateInfo& info) {
     return new GLFWWindow(info);
 }
@@ -48,9 +48,8 @@ bool GLFWWindow::Init(const WindowCreateInfo& info) {
     m_fullscreen = info.fullscreen;
 
     GLFWmonitor* monitor = info.fullscreen ? glfwGetPrimaryMonitor() : nullptr;
-    m_window = glfwCreateWindow(static_cast<int>(info.width),
-                                static_cast<int>(info.height), m_title.c_str(),
-                                monitor, nullptr);
+    m_window = glfwCreateWindow(static_cast<int>(info.width), static_cast<int>(info.height),
+                                m_title.c_str(), monitor, nullptr);
     if (!m_window) {
         SEED_CORE_CRITICAL("GLFW 窗口创建失败");
         return false;
@@ -103,13 +102,12 @@ void GLFWWindow::SetSize(uint32_t width, uint32_t height) {
     m_width = width;
     m_height = height;
     if (m_window) {
-        glfwSetWindowSize(m_window, static_cast<int>(width),
-                          static_cast<int>(height));
+        glfwSetWindowSize(m_window, static_cast<int>(width), static_cast<int>(height));
     }
 }
 
 void GLFWWindow::SetFullscreen(bool fullscreen) {
-    // 阶段 A 暂不支持运行时切换全屏，仅记录状态。
+    // 阶段 A 暂不支持运行时切换全屏，仅记录状态
     m_fullscreen = fullscreen;
 }
 
@@ -124,7 +122,8 @@ void GLFWWindow::SetupWindowHints(const WindowCreateInfo& info) {
 #ifdef __APPLE__
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 #endif
-    } else {
+    }
+    else {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     }
 
@@ -146,8 +145,8 @@ void GLFWWindow::OnFramebufferResize(GLFWwindow* window, int width, int height) 
 }
 
 void GLFWWindow::OnWindowClose(GLFWwindow* window) {
-    // 阶段 C 接入事件系统后，这里会上抛 WindowCloseEvent。
-    // 目前 ShouldClose() 已能反映关闭状态。
+    // 阶段 C 接入事件系统后，这里会上抛 WindowCloseEvent
+    // 目前 ShouldClose() 已能反映关闭状态
     (void)window;
 }
 

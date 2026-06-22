@@ -20,8 +20,8 @@ struct WindowCreateInfo {
     bool headless = false;
 };
 
-// 窗口抽象：GLFW 是当前唯一实现（GLFWWindow）。
-// 通过 Window::Create(info) 工厂创建具体平台实例。
+// 窗口抽象：GLFW 是当前唯一实现（GLFWWindow）.
+// 通过 Window::Create(info) 工厂创建具体平台实例
 class Window {
 public:
     virtual ~Window() = default;

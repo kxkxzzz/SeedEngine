@@ -44,7 +44,7 @@ private:
     bool m_resizable = true;
     bool m_fullscreen = false;
 
-    // GLFW 全局初始化引用计数：多窗口时只 init/terminate 一次。
+    // GLFW 全局初始化引用计数：多窗口时只 init/terminate 一次
     static int s_glfwWindowCount;
 };
 

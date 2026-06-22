@@ -9,8 +9,8 @@
 
 namespace seed {
 
-// 双 logger：Core 给引擎内部用，Client 给客户端（Sandbox/Editor）用，
-// 两者输出带不同名称前缀，便于区分日志来源。
+// 双 logger：Core 给引擎内部用，Client 给客户端（Sandbox/Editor）用,
+// 两者输出带不同名称前缀，便于区分日志来源
 class Log {
 public:
     static void Init();

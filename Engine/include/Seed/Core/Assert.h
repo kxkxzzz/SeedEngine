@@ -3,7 +3,7 @@
 
 #include "Seed/Core/Log.h"
 
-// 调试中断：clang-cl / MSVC 用 __debugbreak，其它平台回退到 SIGTRAP。
+// 调试中断：clang-cl / MSVC 用 __debugbreak，其它平台回退到 SIGTRAP
 #if defined(_MSC_VER)
     #define SEED_DEBUGBREAK() __debugbreak()
 #elif defined(__clang__) || defined(__GNUC__)
@@ -14,7 +14,7 @@
 #endif
 
 #ifdef SEED_DEBUG
-    // 条件为假时：打错误日志（含文件:行号）并中断。
+    // 条件为假时：打错误日志（含文件:行号）并中断
     // 用法：SEED_ASSERT(ptr != nullptr, "ptr 不能为空: {}", name);
     #define SEED_ASSERT(check, ...)                                       \
         do {                                                              \
@@ -34,7 +34,7 @@
             }                                                             \
         } while (0)
 #else
-    // Release：断言编译为空，零开销。
+    // Release：断言编译为空，零开销
     #define SEED_ASSERT(check, ...)
     #define SEED_CORE_ASSERT(check, ...)
 #endif

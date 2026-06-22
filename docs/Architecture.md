@@ -3,7 +3,7 @@
 > 本文档记录引擎的结构、各文件作用、运行时数据流与关键设计取舍。
 > 随代码演进持续维护——每完成一个阶段（见 [ROADMAP.md](../ROADMAP.md)）就更新对应章节。
 >
-> 当前进度：**阶段 A 完成**（构建系统 + 窗口 + OpenGL 上下文）。
+> 当前进度：**阶段 B 完成**（日志系统 + 断言宏）。
 
 ---
 
@@ -32,10 +32,13 @@ SeedEngine/
 │   │   └── Core/
 │   │       ├── Window.h        # 窗口抽象接口 + 工厂
 │   │       ├── Application.h    # 应用基类（引擎脊柱）
-│   │       └── EntryPoint.h     # 提供 main()
+│   │       ├── EntryPoint.h     # 提供 main()
+│   │       ├── Log.h           # 日志系统（封装 spdlog）+ 日志宏
+│   │       └── Assert.h        # 断言宏（Debug 下打日志并中断）
 │   └── src/                # 私有实现：客户端看不到
 │       ├── Core/
-│       │   └── Application.cpp
+│       │   ├── Application.cpp
+│       │   └── Log.cpp
 │       └── Platform/GLFW/
 │           ├── GLFWWindow.h     # Window 的 GLFW 实现（私有头）
 │           └── GLFWWindow.cpp   # 实现 + Window::Create 工厂落地
@@ -79,6 +82,19 @@ SeedEngine/
 - 客户端 `#include <Seed/Core/EntryPoint.h>` 即自动获得 `main`。
 - `main` 干三件事：`CreateApplication()` → `Run()` → `delete`。
 - **为什么放头文件**：`main` 必须编进可执行文件（Sandbox），不能编进静态库（Engine）。放头文件让 Sandbox 的 .cpp 来 include 并生成 main。
+
+#### `Log.h` —— 日志系统
+封装 spdlog，提供双 logger 与一组日志宏。
+- 两个 logger：`CoreLogger`（引擎内部，输出前缀 `SEED`）和 `ClientLogger`（客户端，前缀 `APP`），便于区分日志来源。
+- `Log::Init()`：创建两个彩色控制台 logger，设置格式 `[时间] 名称: 消息`，按等级着色。
+- 日志宏分两套：`SEED_CORE_*`（引擎用）和 `SEED_*`（客户端用），各含 TRACE/INFO/WARN/ERROR/CRITICAL。变参转发给 spdlog，支持 `{}` 占位格式化。
+- **取舍**：公开头直接 include `spdlog.h`（较重）。因为日志是基础设施、到处都用，这个传染是可接受的（Hazel 同款做法）。
+
+#### `Assert.h` —— 断言宏
+- `SEED_ASSERT(cond, ...)` / `SEED_CORE_ASSERT(cond, ...)`：条件为假时打错误日志（含 `__FILE__:__LINE__`）并触发调试中断。
+- `SEED_DEBUGBREAK()`：clang-cl/MSVC 用 `__debugbreak()`，GCC/Clang 用 `raise(SIGTRAP)`。
+- 只在定义了 `SEED_DEBUG`（Debug 配置）时生效；Release 下宏展开为空，**零开销**。
+- `SEED_DEBUG`/`SEED_RELEASE` 由 CMake 按构建配置定义（见 Engine/CMakeLists.txt）。
 
 ### 私有实现（src/）
 
@@ -143,6 +159,7 @@ SeedEngine/
        └─ CreateApplication() [Sandbox 实现] → new Sandbox()
             └─ Application 构造 [Application.cpp]
                  ├─ s_instance = this
+                 ├─ Log::Init()  ← 日志最先初始化，后续模块都依赖它
                  └─ Window::Create(info) → new GLFWWindow(info)
                       └─ GLFWWindow::Init()
                            ├─ glfwInit() (首个窗口)
@@ -182,7 +199,6 @@ SeedEngine/
 | `Run()` 里直接调 `glClear` | 阶段 E（RHI）抽象成渲染命令 |
 | `OnWindowClose` 回调是空的 | 阶段 C（事件系统）上抛 `WindowCloseEvent` |
 | 没有 Layer 栈 | 阶段 D |
-| 没有日志 | 阶段 B（下一步） |
 
 这套结构的好处：每个后续阶段都是往骨架里"填肉"，不用再动骨架。
 

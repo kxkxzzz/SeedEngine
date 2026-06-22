@@ -4,7 +4,7 @@
 #include <glad/gl.h>  // 必须在 glfw3.h 之前包含
 #include <GLFW/glfw3.h>
 
-#include <iostream>
+#include "Seed/Core/Log.h"
 
 namespace seed {
 
@@ -34,7 +34,7 @@ bool GLFWWindow::Init(const WindowCreateInfo& info) {
     // 首个窗口负责初始化 GLFW
     if (s_glfwWindowCount == 0) {
         if (!glfwInit()) {
-            std::cerr << "[GLFWWindow] Failed to initialize GLFW" << std::endl;
+            SEED_CORE_CRITICAL("GLFW 初始化失败");
             return false;
         }
     }
@@ -52,7 +52,7 @@ bool GLFWWindow::Init(const WindowCreateInfo& info) {
                                 static_cast<int>(info.height), m_title.c_str(),
                                 monitor, nullptr);
     if (!m_window) {
-        std::cerr << "[GLFWWindow] Failed to create GLFW window" << std::endl;
+        SEED_CORE_CRITICAL("GLFW 窗口创建失败");
         return false;
     }
     ++s_glfwWindowCount;
@@ -65,12 +65,11 @@ bool GLFWWindow::Init(const WindowCreateInfo& info) {
 
         int version = gladLoadGL(glfwGetProcAddress);
         if (version == 0) {
-            std::cerr << "[GLFWWindow] Failed to initialize glad (OpenGL loader)"
-                      << std::endl;
+            SEED_CORE_CRITICAL("glad 初始化失败（OpenGL 加载器）");
             return false;
         }
-        std::cout << "[GLFWWindow] OpenGL " << GLAD_VERSION_MAJOR(version) << "."
-                  << GLAD_VERSION_MINOR(version) << " loaded" << std::endl;
+        SEED_CORE_INFO("OpenGL {}.{} 已加载", GLAD_VERSION_MAJOR(version),
+                       GLAD_VERSION_MINOR(version));
 
         glfwSwapInterval(1);  // 垂直同步
     }

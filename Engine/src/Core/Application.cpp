@@ -3,12 +3,18 @@
 
 #include <glad/gl.h>
 
+#include "Seed/Core/Log.h"
+
 namespace seed {
 
 Application* Application::s_instance = nullptr;
 
 Application::Application() {
     s_instance = this;
+
+    // 日志须最先初始化，后续所有模块都依赖它
+    Log::Init();
+    SEED_CORE_INFO("SeedEngine 启动");
 
     WindowCreateInfo info;
     info.title = "SeedEngine";

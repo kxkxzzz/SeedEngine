@@ -4,6 +4,7 @@ add_library(SeedEngine STATIC
     src/Core/Application.cpp
     src/Core/Log.cpp
     src/Platform/GLFW/GLFWWindow.cpp
+    src/Core/LayerStack.cpp
 )
 
 # 现代 CMake 别名：客户端用 Seed::Engine 链接

@@ -2,6 +2,7 @@
 #include "Seed/Core/Application.h"
 
 #include <glad/gl.h>
+#include <GLFW/glfw3.h>
 
 #include "Seed/Core/Log.h"
 #include "Seed/Events/Event.h"
@@ -22,15 +23,29 @@ Application::Application() {
     info.width  = 1280;
     info.height = 720;
     m_window.reset(Window::Create(info));
-
-    // 把 OnEvent 绑定到 Window 的事件回调，GLFW 触发后会流入此处
     m_window->SetEventCallback(SEED_BIND_EVENT_FN(Application::OnEvent));
 }
 
 Application::~Application() = default;
 
+void Application::PushLayer(Layer* layer) {
+    m_layerStack.PushLayer(layer);
+}
+
+void Application::PushOverlay(Layer* overlay) {
+    m_layerStack.PushOverlay(overlay);
+}
+
 void Application::Run() {
     while (m_running) {
+        float time = static_cast<float>(glfwGetTime());
+        Timestep ts = time - m_lastFrameTime;
+        m_lastFrameTime = time;
+
+        // 从底向上逐层 Update
+        for (auto* layer : m_layerStack)
+            layer->OnUpdate(ts);
+
         glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -40,10 +55,14 @@ void Application::Run() {
 }
 
 void Application::OnEvent(Event& e) {
-    SEED_CORE_TRACE("{}", e.ToString());
-
     EventDispatcher dispatcher(e);
     dispatcher.Dispatch<WindowCloseEvent>(SEED_BIND_EVENT_FN(Application::OnWindowClose));
+
+    // 从栈顶向下分发，某层处理后设 Handled=true 则停止传递
+    for (auto it = m_layerStack.rbegin(); it != m_layerStack.rend(); ++it) {
+        if (e.Handled) break;
+        (*it)->OnEvent(e);
+    }
 }
 
 bool Application::OnWindowClose(WindowCloseEvent& /*e*/) {

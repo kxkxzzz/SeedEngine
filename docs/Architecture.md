@@ -3,7 +3,7 @@
 > 本文档记录引擎的结构、各文件作用、运行时数据流与关键设计取舍。
 > 随代码演进持续维护——每完成一个阶段（见 [ROADMAP.md](../ROADMAP.md)）就更新对应章节。
 >
-> 当前进度：**阶段 B 完成**（日志系统 + 断言宏）。
+> 当前进度：**阶段 D 完成**（Layer 栈 + Timestep + 事件分发）。
 
 ---
 
@@ -31,14 +31,18 @@ SeedEngine/
 │   ├── include/Seed/       # 公开头：客户端 #include <Seed/...>
 │   │   └── Core/
 │   │       ├── Window.h        # 窗口抽象接口 + 工厂
-│   │       ├── Application.h    # 应用基类（引擎脊柱）
-│   │       ├── EntryPoint.h     # 提供 main()
+│   │       ├── Application.h   # 应用基类（引擎脊柱）
+│   │       ├── EntryPoint.h    # 提供 main()
 │   │       ├── Log.h           # 日志系统（封装 spdlog）+ 日志宏
-│   │       └── Assert.h        # 断言宏（Debug 下打日志并中断）
+│   │       ├── Assert.h        # 断言宏（Debug 下打日志并中断）
+│   │       ├── Layer.h         # Layer 抽象基类
+│   │       ├── LayerStack.h    # Layer 容器，普通层/Overlay 分区管理
+│   │       └── TimeStep.h      # 帧间隔时间封装
 │   └── src/                # 私有实现：客户端看不到
 │       ├── Core/
 │       │   ├── Application.cpp
-│       │   └── Log.cpp
+│       │   ├── Log.cpp
+│       │   └── LayerStack.cpp
 │       └── Platform/GLFW/
 │           ├── GLFWWindow.h     # Window 的 GLFW 实现（私有头）
 │           └── GLFWWindow.cpp   # 实现 + Window::Create 工厂落地
@@ -95,6 +99,28 @@ SeedEngine/
 - `SEED_DEBUGBREAK()`：clang-cl/MSVC 用 `__debugbreak()`，GCC/Clang 用 `raise(SIGTRAP)`。
 - 只在定义了 `SEED_DEBUG`（Debug 配置）时生效；Release 下宏展开为空，**零开销**。
 - `SEED_DEBUG`/`SEED_RELEASE` 由 CMake 按构建配置定义（见 Engine/CMakeLists.txt）。
+
+#### `TimeStep.h` —— 帧间隔时间
+封装每帧的 delta time，避免各处裸传 `float`。
+- `GetSeconds()` / `GetMilliseconds()`：两种精度访问。
+- `operator float()`：隐式转换，方便直接传给需要 float 的函数。
+- header-only，无对应 .cpp。
+
+#### `Layer.h` —— Layer 抽象基类
+定义"一个层应该能做什么"，客户端继承并重写虚函数。
+- `OnAttach()`：被 push 进栈时调用，做初始化。
+- `OnDetach()`：被移出栈时调用，做清理。
+- `OnUpdate(Timestep ts)`：每帧逻辑，接收帧间隔。
+- `OnEvent(Event& e)`：接收事件，可设 `e.Handled = true` 阻止向下传递。
+- `OnImGuiRender()`：预留给 ImGui 阶段（阶段 H）。
+- 所有方法默认空实现，子类按需重写。header-only。
+
+#### `LayerStack.h / LayerStack.cpp` —— Layer 容器
+用**单个 vector + 插入指针**管理普通层和 Overlay，保证遍历时天然有序。
+- `PushLayer`：插入到 `m_layerInsertIndex` 位置，`++m_layerInsertIndex`，调用 `OnAttach`。
+- `PushOverlay`：`push_back` 到末尾，调用 `OnAttach`。
+- `PopLayer` / `PopOverlay`：找到后调 `OnDetach`，erase，Pop Layer 时 `--m_layerInsertIndex`。
+- 提供 `begin/end/rbegin/rend`：Update 用正向遍历，Event 用反向遍历。
 
 ### 私有实现（src/）
 
@@ -169,9 +195,14 @@ SeedEngine/
                            └─ 注册 resize/close 回调
        └─ app->Run()  ← 主循环开始
             每帧:
-              ① glClear()           清屏
-              ② SwapBuffers()       显示这一帧
-              ③ PollEvents()        处理输入/窗口事件 → 触发回调
+              ① 计算 Timestep = now - lastFrameTime
+              ② for layer in layerStack: layer->OnUpdate(ts)   从底向上
+              ③ glClear()           清屏
+              ④ SwapBuffers()       显示这一帧
+              ⑤ PollEvents()        处理输入/窗口事件 → 触发回调
+                  └─ OnEvent(e)
+                       ├─ Dispatch<WindowCloseEvent> → OnWindowClose → m_running=false
+                       └─ for layer in layerStack.rbegin(): layer->OnEvent(e)  从顶向下
             直到 ShouldClose()==true (用户点 X)
        └─ delete app
             └─ ~GLFWWindow: glfwDestroyWindow + glfwTerminate(最后一个)
@@ -197,8 +228,8 @@ SeedEngine/
 | 现状 | 将在哪个阶段完善 |
 |---|---|
 | `Run()` 里直接调 `glClear` | 阶段 E（RHI）抽象成渲染命令 |
-| `OnWindowClose` 回调是空的 | 阶段 C（事件系统）上抛 `WindowCloseEvent` |
-| 没有 Layer 栈 | 阶段 D |
+| `OnWindowClose` 回调是空的 | 已在阶段 C 实现 |
+| glfwGetTime() 直接在 Application 里调用 | 阶段 E 换成平台无关的时间接口 |
 
 这套结构的好处：每个后续阶段都是往骨架里"填肉"，不用再动骨架。
 

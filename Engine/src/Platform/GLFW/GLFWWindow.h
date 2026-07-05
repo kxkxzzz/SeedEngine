@@ -14,6 +14,7 @@ public:
     explicit GLFWWindow(const WindowCreateInfo& info);
     ~GLFWWindow() override;
 
+    // 设置事件回调函数，GLFW 回调触发后上抛给 Application
     void SetEventCallback(const EventCallbackFn& callback) override {
         m_data.EventCallback = callback;
     }
@@ -22,12 +23,24 @@ public:
     bool ShouldClose() override;
     void SwapBuffers() override;
 
-    void* GetNativeWindow() const override { return m_window; }
-    uint32_t GetWidth() const override { return m_data.Width; }
-    uint32_t GetHeight() const override { return m_data.Height; }
-    std::string_view GetTitle() const override { return m_data.Title; }
-    bool IsResizable() const override { return m_resizable; }
-    bool IsFullscreen() const override { return m_fullscreen; }
+    void* GetNativeWindow() const override {
+        return m_window;
+    }
+    uint32_t GetWidth() const override {
+        return m_data.Width;
+    }
+    uint32_t GetHeight() const override {
+        return m_data.Height;
+    }
+    std::string_view GetTitle() const override {
+        return m_data.Title;
+    }
+    bool IsResizable() const override {
+        return m_resizable;
+    }
+    bool IsFullscreen() const override {
+        return m_fullscreen;
+    }
 
     void SetTitle(std::string_view title) override;
     void SetSize(uint32_t width, uint32_t height) override;

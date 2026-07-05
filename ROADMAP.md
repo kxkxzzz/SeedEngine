@@ -1,12 +1,15 @@
 # SeedEngine 实现路线
 
-> 定位：基于 OpenGL 的迷你游戏引擎，主线 = **架构 + 渲染 + 编辑器**。
-> 参考：Hazel（架构/Layer/RHI）、Games104（理念/模块边界）、GameEngineFromScratch（你现有的 IRuntimeModule 骨架）。
+> 定位：基于 OpenGL 的迷你游戏引擎，主线 = **架构 + 3D 渲染（PBR）+ 编辑器**。
+> 参考：Hazel（架构/Layer/RHI）、LearnOpenGL（3D/PBR 技术）、Games104（理念/模块边界）。
 >
-> 已确认的三个方向：
+> 已确认的方向：
 > 1. **RHI 抽象层**：按 Vulkan 心智模型设计接口，先只实现 OpenGL 后端。
 > 2. **优先架构地基**：先做 Layer 栈、事件、日志/断言、RHI 抽象，再做渲染画面。
-> 3. 物理/音频/网络只做 demo，不投入主线时间。
+> 3. **重心放在 3D 渲染**：尽可能多实现 3D 渲染技术，目标做到 PBR + IBL + 阴影 + 后处理。
+> 4. Renderer2D 批渲染、物理/音频/网络**跳过或只做 demo**，不投入主线时间。
+>
+> **进度**：阶段 A-D 已完成，阶段 E（RHI）进行中。
 
 ---
 
@@ -100,41 +103,70 @@ CMake 建议：根 `CMakeLists.txt` 用 `option()` 控制是否启用 assimp 等
 - **验收**：用 RHI 接口画出一个彩色三角形（不直接调任何 `gl*`，全走抽象）。
 - **面试点**：这是"懂引擎"和"会 OpenGL"的分水岭。讲清"为什么 BufferLayout 自动算 offset""为什么资源创建/绑定分离""OpenGL 后端如何模拟 Vulkan 的显式 pipeline"。
 
-### 阶段 F — Renderer + Camera（2-3 天）
-- **做什么**：`Renderer` 持有"场景级"数据（view-projection 矩阵），`BeginScene/Submit/EndScene`；`OrthographicCamera`（先正交）+ `CameraController`（WASD/缩放）。
-- **验收**：相机能移动，三角形随相机变换。
-- **面试点**：渲染指令的收集与提交模型。
+### 阶段 F — Renderer + 3D 相机（2-3 天）
+- **做什么**：`Renderer` 持有场景级数据（view-projection 矩阵），`BeginScene/Submit/EndScene`；直接做 `PerspectiveCamera`（透视）+ `CameraController`（轨道/FPS 风格，鼠标+WASD）。
+- **验收**：透视相机能自由移动/旋转，三角形/立方体随相机变换，深度测试正确。
+- **面试点**：渲染指令的收集与提交模型、MVP 矩阵、透视投影。
 
-### 阶段 G — Renderer2D 批渲染（2-3 天，性价比极高）
-- **做什么**：`Renderer2D::DrawQuad`，内部做 **batching**（一个大 VBO 累积顶点，纹理 slot 数组，凑满或 EndScene 时一次 DrawIndexed）。
-- **验收**：屏幕上几千个带纹理的 quad，帧率正常；统计 draw call 数。
-- **面试点**：批渲染是 2D 引擎性能必考点，能讲 draw call 合并、纹理槽管理。
+> **跳过原 Renderer2D 批渲染阶段**——那是 2D 专属优化，不在 3D/PBR 主线上。如以后想补充，可作为独立分支。
 
-### 阶段 H — ImGui 集成 + 编辑器雏形（2-3 天）
-- **做什么**：`ImGuiLayer`（接 imgui glfw+opengl3 backend，开 docking）；Editor 里把场景渲染到 `Framebuffer`，在 ImGui `Image` 控件里显示为 Viewport 面板。
-- **验收**：编辑器有可停靠面板，Viewport 显示渲染结果，有个统计面板显示帧率/draw call。
-- **面试点**：渲染到纹理 + 编辑器 = 最直观的"这是个引擎"证据，截图放简历。
+### 阶段 G — Mesh + 模型加载（2-3 天）
+- **做什么**：`Mesh`（顶点含 位置/法线/UV/切线 + 索引）；`Texture2D` 用 stb_image 加载图片；assimp 加载 .obj/.gltf 模型转成 `Mesh`。
+- **验收**：加载一个带贴图的 3D 模型（如经典的 backpack/nanosuit）并显示。
+- **面试点**：顶点属性布局、模型数据组织、资源加载管线。
 
-### 阶段 I — ECS 场景系统（2-4 天，Games104 理念落地）
-- **做什么**：entt 封装 `Scene` + `Entity`；`TransformComponent`/`SpriteRendererComponent`/`TagComponent`/`CameraComponent`；`Scene::OnUpdate` 遍历有 Transform+Sprite 的实体提交渲染。
-- **进阶**：`SceneHierarchyPanel`（左侧实体列表）+ `Inspector`（右侧改组件属性）；`SceneSerializer`（yaml 存读场景）。
-- **验收**：编辑器里增删实体、拖动 Transform 实时看到 quad 移动、保存/加载场景文件。
-- **面试点**：ECS 的数据布局优势（cache 友好）、为什么用 entt、组件序列化。
+### 阶段 H — 光照（Blinn-Phong）（2-3 天）
+- **做什么**：`Light`（方向光/点光源/聚光灯）；Blinn-Phong 着色（环境+漫反射+高光）；多光源；法线贴图（切线空间）。
+- **验收**：模型在多光源下有正确的明暗、高光、法线细节。
+- **面试点**：光照方程、切线空间、为什么 Blinn-Phong 优于 Phong。这是理解 PBR 的必经之路。
 
-### 阶段 J — 3D 渲染（按精力扩展，最能体现图形深度）
-顺序：`PerspectiveCamera` → assimp 加载 mesh → Blinn-Phong 光照 → 方向光阴影（shadow map）→ PBR（金属/粗糙度 + IBL）→ 后处理（HDR/Bloom/Tonemapping）。
-每加一项都能在编辑器里截图，且都是图形面试高频题。
+### 阶段 I — PBR（核心目标，4-6 天）
+- **做什么**：
+  - Cook-Torrance BRDF（金属度/粗糙度工作流）
+  - 材质系统：Albedo/Metallic/Roughness/AO/Normal 贴图组合
+  - IBL 环境光照：HDR 环境贴图 → 辐照度图（漫反射）+ 预过滤环境图 + BRDF LUT（镜面）
+  - 天空盒（立方体贴图）
+- **验收**：金属/非金属材质球阵列在 HDR 环境下有真实的反射和光照。
+- **面试点**：PBR 是图形岗位的核心考点，能讲 BRDF、能量守恒、IBL 预计算。**这是简历的最大亮点。**
+
+### 阶段 J — 阴影（2-4 天）
+- **做什么**：Shadow Mapping（方向光深度图）→ PCF 软阴影 →（进阶）CSM 级联阴影。
+- **验收**：物体投射出带软边缘的阴影。
+- **面试点**：深度图、阴影失真（bias）、PCF 采样、级联划分。
+
+### 阶段 K — 后处理管线（2-4 天）
+- **做什么**：`Framebuffer` 离屏渲染 → HDR + Tonemapping + Gamma 校正 → Bloom（泛光）→（进阶）SSAO / FXAA。
+- **验收**：画面有 HDR 高光溢出（Bloom）、正确的色调映射，观感明显提升。
+- **面试点**：HDR 管线、后处理链、屏幕空间技术。
+
+### 阶段 L — ImGui 编辑器（2-3 天）
+- **做什么**：`ImGuiLayer`（imgui docking 分支）；场景渲染到 `Framebuffer`，在 ImGui `Image` 里显示为 Viewport；材质/光照参数面板实时调节。
+- **验收**：可停靠面板的编辑器，Viewport 显示 3D 场景，右侧面板能实时改材质/光照参数看效果。
+- **面试点**：渲染到纹理 + 编辑器 = 最直观的"这是个引擎"证据，**截图放简历**。
+
+### 阶段 M — ECS 场景系统（可选，2-4 天）
+- **做什么**：entt 封装 `Scene` + `Entity`；`Transform`/`MeshRenderer`/`Light`/`Camera` 组件；`Scene::OnUpdate` 遍历实体提交渲染；Hierarchy + Inspector 面板；场景序列化。
+- **验收**：编辑器里增删 3D 实体、改 Transform/材质、保存加载场景。
+- **面试点**：ECS 数据布局、组件化设计、序列化。
+
+### 进阶技术池（有精力再冲，都是简历亮点）
+- **延迟渲染（Deferred Shading）** — G-Buffer，支持大量光源
+- **SSR 屏幕空间反射**
+- **体积光 / 大气散射**
+- **GPU 实例化** — 大量相同物体一次绘制
+- **视锥剔除（Frustum Culling）** — 性能优化
 
 ---
 
 ## 3. 里程碑节奏建议
 
-- **M1（地基可演示）**：阶段 A-D 完成 → 有窗口、有日志、有 Layer 栈、事件能跑。
-- **M2（看得见的引擎）**：阶段 E-H 完成 → RHI 画三角形 → 2D 批渲染 → ImGui 编辑器 Viewport。**此时已能写进简历并截图。**
-- **M3（像个引擎）**：阶段 I 完成 → ECS + 场景编辑/序列化。
-- **M4（图形深度）**：阶段 J 挑 2-3 个做（推荐：模型加载 + Blinn-Phong + 阴影，或直接冲 PBR）。
+- **M1（地基可演示）✅**：阶段 A-D 完成 → 窗口、日志、Layer 栈、事件。
+- **M2（渲染起步）**：阶段 E-G 完成 → RHI 画三角形 → 3D 相机 → 加载显示模型。
+- **M3（光照与 PBR）**：阶段 H-I 完成 → Blinn-Phong → **PBR + IBL**。此时简历已有强力亮点。
+- **M4（画面完整度）**：阶段 J-L 完成 → 阴影 + 后处理 + 编辑器。**截图非常出彩。**
+- **M5（可选深化）**：阶段 M（ECS）或进阶技术池挑 1-2 项。
 
-求职最低交付建议做到 **M2**，理想到 **M3 + M4 的一两项**。
+求职最低交付建议做到 **M3（PBR）**，理想到 **M4**。
 
 ---
 
@@ -142,9 +174,9 @@ CMake 建议：根 `CMakeLists.txt` 用 `option()` 控制是否启用 assimp 等
 
 1. "我用 Layer 栈解耦了引擎层、编辑器层、ImGui 层" —— 架构。
 2. "我做了后端无关的 RHI，OpenGL 是其中一个实现，接口按显式管线设计以便扩 Vulkan" —— 抽象能力。
-3. "2D 渲染器用批处理把 N 个 quad 合并成一次 draw call" —— 性能。
-4. "场景用 ECS，组件可序列化，编辑器实时编辑" —— 工程完整度。
-5. "3D 部分实现了 XXX（阴影/PBR）" —— 图形深度。
+3. "我实现了完整的 PBR 管线：Cook-Torrance BRDF + IBL 环境光照（辐照度图/预过滤图/BRDF LUT）" —— **图形深度核心**。
+4. "阴影用 Shadow Mapping + PCF，后处理有 HDR/Tonemapping/Bloom" —— 渲染完整度。
+5. "场景用 ECS，材质光照可在编辑器里实时调节" —— 工程完整度。
 
 ---
 

@@ -1,7 +1,6 @@
 // Application.cpp
 #include "Seed/Core/Application.h"
 
-#include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
 #include "Seed/Core/Log.h"
@@ -19,10 +18,11 @@ Application::Application() {
     SEED_CORE_INFO("SeedEngine 启动");
 
     WindowCreateInfo info;
-    info.title  = "SeedEngine";
-    info.width  = 1280;
+    info.title = "SeedEngine";
+    info.width = 1280;
     info.height = 720;
     m_window.reset(Window::Create(info));
+    // 设置事件回调函数，GLFW 回调触发后上抛给 Application
     m_window->SetEventCallback(SEED_BIND_EVENT_FN(Application::OnEvent));
 }
 
@@ -42,25 +42,24 @@ void Application::Run() {
         Timestep ts = time - m_lastFrameTime;
         m_lastFrameTime = time;
 
-        // 从底向上逐层 Update
+        // 清屏与绘制都交给 Layer 通过 RHI 完成，Application 不直接碰 GL
         for (auto* layer : m_layerStack)
             layer->OnUpdate(ts);
-
-        glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
 
         m_window->SwapBuffers();
         m_window->PollEvents();
     }
 }
 
+// 触发事件时的回调函数
 void Application::OnEvent(Event& e) {
     EventDispatcher dispatcher(e);
     dispatcher.Dispatch<WindowCloseEvent>(SEED_BIND_EVENT_FN(Application::OnWindowClose));
 
     // 从栈顶向下分发，某层处理后设 Handled=true 则停止传递
     for (auto it = m_layerStack.rbegin(); it != m_layerStack.rend(); ++it) {
-        if (e.Handled) break;
+        if (e.Handled)
+            break;
         (*it)->OnEvent(e);
     }
 }

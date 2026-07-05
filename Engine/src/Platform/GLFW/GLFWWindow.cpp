@@ -43,15 +43,14 @@ bool GLFWWindow::Init(const WindowCreateInfo& info) {
 
     SetupWindowHints(info);
 
-    m_data.Title  = std::string(info.title);
-    m_data.Width  = info.width;
+    m_data.Title = std::string(info.title);
+    m_data.Width = info.width;
     m_data.Height = info.height;
-    m_resizable   = info.resizable;
-    m_fullscreen  = info.fullscreen;
+    m_resizable = info.resizable;
+    m_fullscreen = info.fullscreen;
 
     GLFWmonitor* monitor = info.fullscreen ? glfwGetPrimaryMonitor() : nullptr;
-    m_window = glfwCreateWindow(static_cast<int>(info.width),
-                                static_cast<int>(info.height),
+    m_window = glfwCreateWindow(static_cast<int>(info.width), static_cast<int>(info.height),
                                 m_data.Title.c_str(), monitor, nullptr);
     if (!m_window) {
         SEED_CORE_CRITICAL("GLFW 窗口创建失败");
@@ -80,23 +79,27 @@ bool GLFWWindow::Init(const WindowCreateInfo& info) {
     return true;
 }
 
-void GLFWWindow::PollEvents() { glfwPollEvents(); }
+void GLFWWindow::PollEvents() {
+    glfwPollEvents();
+}
 
 bool GLFWWindow::ShouldClose() {
     return m_window ? glfwWindowShouldClose(m_window) : true;
 }
 
 void GLFWWindow::SwapBuffers() {
-    if (m_window) glfwSwapBuffers(m_window);
+    if (m_window)
+        glfwSwapBuffers(m_window);
 }
 
 void GLFWWindow::SetTitle(std::string_view title) {
     m_data.Title = std::string(title);
-    if (m_window) glfwSetWindowTitle(m_window, m_data.Title.c_str());
+    if (m_window)
+        glfwSetWindowTitle(m_window, m_data.Title.c_str());
 }
 
 void GLFWWindow::SetSize(uint32_t width, uint32_t height) {
-    m_data.Width  = width;
+    m_data.Width = width;
     m_data.Height = height;
     if (m_window)
         glfwSetWindowSize(m_window, static_cast<int>(width), static_cast<int>(height));
@@ -116,7 +119,8 @@ void GLFWWindow::SetupWindowHints(const WindowCreateInfo& info) {
 #ifdef __APPLE__
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 #endif
-    } else {
+    }
+    else {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     }
 
@@ -137,36 +141,42 @@ void GLFWWindow::SetupCallbacks() {
 
 void GLFWWindow::OnFramebufferResize(GLFWwindow* window, int width, int height) {
     auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-    data.Width  = static_cast<uint32_t>(width);
+    data.Width = static_cast<uint32_t>(width);
     data.Height = static_cast<uint32_t>(height);
     glViewport(0, 0, width, height);
 
     WindowResizeEvent event(data.Width, data.Height);
-    if (data.EventCallback) data.EventCallback(event);
+    if (data.EventCallback)
+        data.EventCallback(event);
 }
 
 void GLFWWindow::OnWindowClose(GLFWwindow* window) {
     auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
     WindowCloseEvent event;
-    if (data.EventCallback) data.EventCallback(event);
+    if (data.EventCallback)
+        data.EventCallback(event);
 }
 
 void GLFWWindow::OnKey(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/) {
     auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-    if (!data.EventCallback) return;
+    if (!data.EventCallback)
+        return;
 
     switch (action) {
-        case GLFW_PRESS: {
+        case GLFW_PRESS:
+        {
             KeyPressedEvent event(key, 0);
             data.EventCallback(event);
             break;
         }
-        case GLFW_REPEAT: {
+        case GLFW_REPEAT:
+        {
             KeyPressedEvent event(key, 1);
             data.EventCallback(event);
             break;
         }
-        case GLFW_RELEASE: {
+        case GLFW_RELEASE:
+        {
             KeyReleasedEvent event(key);
             data.EventCallback(event);
             break;
@@ -177,17 +187,20 @@ void GLFWWindow::OnKey(GLFWwindow* window, int key, int /*scancode*/, int action
 void GLFWWindow::OnChar(GLFWwindow* window, unsigned int codepoint) {
     auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
     KeyTypedEvent event(codepoint);
-    if (data.EventCallback) data.EventCallback(event);
+    if (data.EventCallback)
+        data.EventCallback(event);
 }
 
 void GLFWWindow::OnMouseButton(GLFWwindow* window, int button, int action, int /*mods*/) {
     auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-    if (!data.EventCallback) return;
+    if (!data.EventCallback)
+        return;
 
     if (action == GLFW_PRESS) {
         MouseButtonPressedEvent event(button);
         data.EventCallback(event);
-    } else if (action == GLFW_RELEASE) {
+    }
+    else if (action == GLFW_RELEASE) {
         MouseButtonReleasedEvent event(button);
         data.EventCallback(event);
     }
@@ -196,13 +209,15 @@ void GLFWWindow::OnMouseButton(GLFWwindow* window, int button, int action, int /
 void GLFWWindow::OnCursorPos(GLFWwindow* window, double xPos, double yPos) {
     auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
     MouseMovedEvent event(static_cast<float>(xPos), static_cast<float>(yPos));
-    if (data.EventCallback) data.EventCallback(event);
+    if (data.EventCallback)
+        data.EventCallback(event);
 }
 
 void GLFWWindow::OnScroll(GLFWwindow* window, double xOffset, double yOffset) {
     auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
     MouseScrolledEvent event(static_cast<float>(xOffset), static_cast<float>(yOffset));
-    if (data.EventCallback) data.EventCallback(event);
+    if (data.EventCallback)
+        data.EventCallback(event);
 }
 
 }  // namespace seed

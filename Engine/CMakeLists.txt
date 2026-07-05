@@ -5,6 +5,18 @@ add_library(SeedEngine STATIC
     src/Core/Log.cpp
     src/Platform/GLFW/GLFWWindow.cpp
     src/Core/LayerStack.cpp
+
+    # RHI 抽象层工厂
+    src/RHI/RenderAPI.cpp
+    src/RHI/Buffer.cpp
+    src/RHI/VertexArray.cpp
+    src/RHI/Shader.cpp
+
+    # RHI OpenGL 后端
+    src/RHI/OpenGL/OpenGLRenderAPI.cpp
+    src/RHI/OpenGL/OpenGLBuffer.cpp
+    src/RHI/OpenGL/OpenGLVertexArray.cpp
+    src/RHI/OpenGL/OpenGLShader.cpp
 )
 
 # 现代 CMake 别名：客户端用 Seed::Engine 链接

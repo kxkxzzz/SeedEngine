@@ -4,7 +4,13 @@ add_library(SeedEngine STATIC
     src/Core/Application.cpp
     src/Core/Log.cpp
     src/Platform/GLFW/GLFWWindow.cpp
+    src/Platform/GLFW/GLFWInput.cpp
     src/Core/LayerStack.cpp
+
+    # 渲染器
+    src/Renderer/Renderer.cpp
+    src/Renderer/PerspectiveCamera.cpp
+    src/Renderer/CameraController.cpp
 
     # RHI 抽象层工厂
     src/RHI/RenderAPI.cpp

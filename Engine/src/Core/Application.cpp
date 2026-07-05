@@ -5,6 +5,7 @@
 
 #include "Seed/Core/Log.h"
 #include "Seed/Events/Event.h"
+#include "Seed/Renderer/Renderer.h"
 
 namespace seed {
 
@@ -24,6 +25,9 @@ Application::Application() {
     m_window.reset(Window::Create(info));
     // 设置事件回调函数，GLFW 回调触发后上抛给 Application
     m_window->SetEventCallback(SEED_BIND_EVENT_FN(Application::OnEvent));
+
+    // Renderer 依赖 GL 上下文（窗口创建时已 MakeContextCurrent），必须在窗口创建后初始化
+    Renderer::Init();
 }
 
 Application::~Application() = default;
@@ -42,7 +46,7 @@ void Application::Run() {
         Timestep ts = time - m_lastFrameTime;
         m_lastFrameTime = time;
 
-        // 清屏与绘制都交给 Layer 通过 RHI 完成，Application 不直接碰 GL
+        // 清屏与绘制都交给 Layer 通过 RHI 完成
         for (auto* layer : m_layerStack)
             layer->OnUpdate(ts);
 

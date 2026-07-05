@@ -3,7 +3,7 @@
 > 本文档记录引擎的结构、各文件作用、运行时数据流与关键设计取舍。
 > 随代码演进持续维护——每完成一个阶段（见 [ROADMAP.md](../ROADMAP.md)）就更新对应章节。
 >
-> 当前进度：**阶段 E 完成**（RHI 抽象层 + OpenGL 后端，用抽象接口画出三角形）。
+> 当前进度：**阶段 F 完成**（Renderer + PerspectiveCamera + CameraController，FPS 飞行相机看 3D 立方体）。
 
 ---
 
@@ -29,23 +29,37 @@ SeedEngine/
 ├── Engine/                 # ★ 引擎本体 → 静态库 Seed::Engine
 │   ├── CMakeLists.txt
 │   ├── include/Seed/       # 公开头：客户端 #include <Seed/...>
-│   │   └── Core/
-│   │       ├── Window.h        # 窗口抽象接口 + 工厂
-│   │       ├── Application.h   # 应用基类（引擎脊柱）
-│   │       ├── EntryPoint.h    # 提供 main()
-│   │       ├── Log.h           # 日志系统（封装 spdlog）+ 日志宏
-│   │       ├── Assert.h        # 断言宏（Debug 下打日志并中断）
-│   │       ├── Layer.h         # Layer 抽象基类
-│   │       ├── LayerStack.h    # Layer 容器，普通层/Overlay 分区管理
-│   │       └── TimeStep.h      # 帧间隔时间封装
+│   │   ├── Core/
+│   │   │   ├── Window.h        # 窗口抽象接口 + 工厂
+│   │   │   ├── Application.h   # 应用基类（引擎脊柱）
+│   │   │   ├── EntryPoint.h    # 提供 main()
+│   │   │   ├── Log.h           # 日志系统（封装 spdlog）+ 日志宏
+│   │   │   ├── Assert.h        # 断言宏（Debug 下打日志并中断）
+│   │   │   ├── Layer.h         # Layer 抽象基类
+│   │   │   ├── LayerStack.h    # Layer 容器，普通层/Overlay 分区管理
+│   │   │   ├── TimeStep.h      # 帧间隔时间封装
+│   │   │   ├── Input.h         # 输入状态轮询接口
+│   │   │   ├── KeyCode.h       # 引擎按键码（对齐 GLFW 数值）
+│   │   │   └── MouseCode.h     # 引擎鼠标按键码
+│   │   ├── Events/              # Event 基类 + Window/Key/Mouse 具体事件
+│   │   ├── RHI/                 # 渲染硬件接口抽象（见第 8 节）
+│   │   └── Renderer/
+│   │       ├── PerspectiveCamera.h  # 透视相机：view/projection 矩阵
+│   │       ├── Renderer.h           # BeginScene/Submit/EndScene
+│   │       └── CameraController.h   # FPS 飞行相机控制器
 │   └── src/                # 私有实现：客户端看不到
 │       ├── Core/
 │       │   ├── Application.cpp
 │       │   ├── Log.cpp
 │       │   └── LayerStack.cpp
-│       └── Platform/GLFW/
-│           ├── GLFWWindow.h     # Window 的 GLFW 实现（私有头）
-│           └── GLFWWindow.cpp   # 实现 + Window::Create 工厂落地
+│       ├── Platform/GLFW/
+│       │   ├── GLFWWindow.h/.cpp    # Window 的 GLFW 实现
+│       │   └── GLFWInput.cpp       # Input 的 GLFW 实现
+│       ├── Renderer/
+│       │   ├── Renderer.cpp
+│       │   ├── PerspectiveCamera.cpp
+│       │   └── CameraController.cpp
+│       └── RHI/                    # OpenGL 后端实现（见第 8 节）
 │
 ├── Sandbox/                # 客户端测试程序 → 可执行 Sandbox
 │   ├── CMakeLists.txt
@@ -126,8 +140,14 @@ SeedEngine/
 
 #### `Application.cpp`
 - `s_instance = nullptr`：静态成员须在 .cpp 定义一次（C++ 规则）。
-- 构造：设单例 → 填 `WindowCreateInfo` → `Window::Create(info)` 拿窗口。**全程没有一个 `glfw` 字**，体现抽象价值。
-- `Run()`：当前主循环 = 清屏 → 交换缓冲 → 处理事件。`glClearColor/glClear` 是阶段 A 临时直接调的 GL（阶段 E 做 RHI 后会被 `RenderCommand::Clear()` 取代）。
+- 构造：设单例 → `Log::Init()` → 创建窗口 → 设事件回调 → `Renderer::Init()`。**全程没有一个 `glfw`/`gl` 字**，体现抽象价值。
+- `Run()`：主循环 = 计算 Timestep → 遍历 Layer `OnUpdate` → SwapBuffers → PollEvents。清屏和绘制完全交给 Layer 通过 `Renderer`/RHI 完成，`Application` 不直接碰任何 GL 调用。
+
+#### `Input.h / GLFWInput.cpp` —— 输入状态轮询
+与事件系统互补：事件是被动接收（发生时通知），Input 是主动查询（此刻问"W 按住了吗"）。
+- 静态接口 `IsKeyPressed` / `IsMouseButtonPressed` / `GetMousePosition`，客户端只认 `seed::Key::W` 这类引擎按键码，不碰 GLFW 宏。
+- `GLFWInput.cpp` 通过 `Application::Get().GetWindow().GetNativeWindow()` 拿到 `GLFWwindow*`，转发给 `glfwGetKey` 等。
+- `KeyCode.h` / `MouseCode.h`：数值特意与 GLFW 对齐，映射零开销，但类型是 `seed::KeyCode`，不是 GLFW 类型。
 
 #### `GLFWWindow.h / .cpp`
 - `class GLFWWindow : public Window`：实现那份契约。
@@ -192,14 +212,20 @@ SeedEngine/
                            ├─ 设 GL 4.6 Core hints
                            ├─ glfwCreateWindow()
                            ├─ glfwMakeContextCurrent() + gladLoadGL()  ← OpenGL 4.6 loaded
-                           └─ 注册 resize/close 回调
+                           └─ 注册 resize/close/键盘/鼠标 回调
+       └─ Renderer::Init()  ← 创建全局 RenderAPI，Application 构造最后一步
        └─ app->Run()  ← 主循环开始
             每帧:
               ① 计算 Timestep = now - lastFrameTime
               ② for layer in layerStack: layer->OnUpdate(ts)   从底向上
-              ③ glClear()           清屏
-              ④ SwapBuffers()       显示这一帧
-              ⑤ PollEvents()        处理输入/窗口事件 → 触发回调
+                  └─ Layer 内部：
+                       ├─ CameraController::OnUpdate() 轮询 Input，移动/旋转相机
+                       ├─ Renderer::Clear()
+                       ├─ Renderer::BeginScene(camera)  记录 ViewProjection 矩阵
+                       ├─ Renderer::Submit(shader, vao, transform)  绘制一个物体
+                       └─ Renderer::EndScene()
+              ③ SwapBuffers()       显示这一帧
+              ④ PollEvents()        处理输入/窗口事件 → 触发回调
                   └─ OnEvent(e)
                        ├─ Dispatch<WindowCloseEvent> → OnWindowClose → m_running=false
                        └─ for layer in layerStack.rbegin(): layer->OnEvent(e)  从顶向下
@@ -227,9 +253,9 @@ SeedEngine/
 
 | 现状 | 将在哪个阶段完善 |
 |---|---|
-| Layer 自己持有 RenderAPI 画三角形 | 阶段 F 抽出 Renderer 统一管理 |
-| `OnWindowClose` 回调是空的 | 已在阶段 C 实现 |
 | glfwGetTime() 直接在 Application 里调用 | 后续换成平台无关的时间接口 |
+| `Renderer::Submit` 每次都全量设 uniform，无渲染队列/排序 | 后续按需扩展（当前物体数量少，非瓶颈） |
+| 立方体顶点色手写、无光照 | 阶段 G-H：Mesh/贴图/Blinn-Phong |
 
 这套结构的好处：每个后续阶段都是往骨架里"填肉"，不用再动骨架。
 
@@ -274,6 +300,42 @@ SandboxApp（只用 RHI 接口，无一句 gl*）
   → Shader::Create()  → 编译链接 GLSL program
   → 每帧 Clear() + shader->Bind() + DrawIndexed()  → glDrawElements
 ```
+
+---
+
+## 9. Renderer 与相机（阶段 F）
+
+把"Layer 自己攥着 RenderAPI 画三角形"升级为正规的渲染管线：相机产出矩阵，Renderer 统一提交绘制。
+
+### PerspectiveCamera —— 透视相机
+
+持有 `view` 和 `projection` 两个矩阵，合成 `ViewProjection` 供 shader 做 MVP 变换。
+
+- **projection**：`glm::perspective(fov, aspect, near, far)`，只在 FOV/宽高比/裁剪面变化时重算（如窗口 resize）。
+- **view**：由位置 + 欧拉角(yaw/pitch) 算出：
+  1. 欧拉角 → `forward` 向量（球坐标转笛卡尔坐标的标准公式）
+  2. `right = normalize(cross(forward, worldUp))`，`up = normalize(cross(right, forward))`——叉乘求出与两个向量都垂直的方向
+  3. `glm::lookAt(position, position + forward, up)` 生成 view 矩阵
+- `SetPosition`/`SetRotation` 改动后立即重算 view，`GetViewProjectionMatrix()` 始终是最新值——不用外部手动同步。
+
+### Renderer —— 静态渲染器
+
+全引擎唯一的静态类，是 Layer 和 RHI 之间的中间层。
+
+- `Init()`：创建全局 `RenderAPI`（在 `Application` 构造、GL 上下文就绪后调用一次）。
+- `SetClearColor()` / `Clear()`：转发给 `RenderAPI`，Layer 不必直接持有 `RenderAPI`。
+- `BeginScene(camera)`：把相机的 `ViewProjectionMatrix` 存进 `SceneData`（该帧全局共享的场景数据，以后扩展光源/环境贴图都加在这里）。
+- `Submit(shader, vertexArray, transform)`：`shader->Bind()` → 设 `u_ViewProjection`/`u_Transform` 两个约定 uniform → `DrawIndexed`。这是引擎和 shader 之间的**契约**——任何 shader 想被 `Renderer::Submit` 正确渲染，必须声明这两个 uniform。
+
+### CameraController —— FPS 飞行相机
+
+持有一个 `PerspectiveCamera`，每帧翻译"输入状态"为"相机变化"。
+
+- **移动**：轮询 `Input::IsKeyPressed`，WASD 沿相机的 `forward`/`right` 平面移动，Space/Shift 沿世界 Y 轴升降。
+- **视角旋转**：**右键按住时才旋转**（避免一进窗口视角就乱转）；用**相对上一帧的鼠标位移**（delta）算 yaw/pitch，而非绝对坐标，否则转向会跳变。
+- `m_firstMouse` 标志：首次按下右键或每次松开重置，避免因鼠标位置跳变导致视角"猛转一下"。
+- `pitch` 限制在 `[-89°, 89°]`：防止到 90° 时 `forward` 与 `worldUp` 平行，叉乘退化为零向量。
+- `OnEvent` 里用 `EventDispatcher` 监听 `WindowResizeEvent`，同步更新相机宽高比；返回 `false` 表示不消费事件（其他 Layer 可能也关心 resize）。
 
 ---
 

@@ -3,7 +3,7 @@
 > 本文档记录引擎的结构、各文件作用、运行时数据流与关键设计取舍。
 > 随代码演进持续维护——每完成一个阶段（见 [ROADMAP.md](../ROADMAP.md)）就更新对应章节。
 >
-> 当前进度：**阶段 D 完成**（Layer 栈 + Timestep + 事件分发）。
+> 当前进度：**阶段 E 完成**（RHI 抽象层 + OpenGL 后端，用抽象接口画出三角形）。
 
 ---
 
@@ -227,11 +227,53 @@ SeedEngine/
 
 | 现状 | 将在哪个阶段完善 |
 |---|---|
-| `Run()` 里直接调 `glClear` | 阶段 E（RHI）抽象成渲染命令 |
+| Layer 自己持有 RenderAPI 画三角形 | 阶段 F 抽出 Renderer 统一管理 |
 | `OnWindowClose` 回调是空的 | 已在阶段 C 实现 |
-| glfwGetTime() 直接在 Application 里调用 | 阶段 E 换成平台无关的时间接口 |
+| glfwGetTime() 直接在 Application 里调用 | 后续换成平台无关的时间接口 |
 
 这套结构的好处：每个后续阶段都是往骨架里"填肉"，不用再动骨架。
+
+---
+
+## 8. RHI 抽象层（阶段 E）
+
+后端无关的渲染硬件接口。上层只认抽象接口，OpenGL 是其中一个实现，未来可扩 Vulkan。
+
+### 分层
+
+```
+include/Seed/RHI/           # 抽象接口（公开）
+    RendererAPIType.h        # enum 当前后端（None/OpenGL/Vulkan）
+    RenderAPI.h              # 渲染命令 Init/Clear/DrawIndexed + 持有当前后端类型
+    Buffer.h                 # VertexBuffer/IndexBuffer/BufferLayout
+    VertexArray.h            # 把 VBO+IBO 绑成可绘制单元
+    Shader.h                 # 编译 GLSL + 设 uniform
+    Texture.h / Framebuffer.h # 贴图 / 离屏渲染目标（接口先行，实现在后续阶段）
+
+src/RHI/                    # 工厂（私有）
+    RenderAPI.cpp / Buffer.cpp / VertexArray.cpp / Shader.cpp
+        每个抽象类的 Create() 在此 switch(当前后端) 返回对应实现
+
+src/RHI/OpenGL/             # OpenGL 后端实现（私有）
+    OpenGLRenderAPI / OpenGLBuffer / OpenGLVertexArray / OpenGLShader
+```
+
+### 核心设计
+
+- **工厂模式解耦**：`VertexBuffer::Create(...)` 内部按 `RenderAPI::GetAPI()` 返回 `OpenGLVertexBuffer`，上层拿到的是接口指针，不知道后端。
+- **BufferLayout 自动算偏移/步长**：声明"顶点 = Float3 位置 + Float3 颜色"，构造时自动算出每个属性 Offset 和总 Stride。`OpenGLVertexArray::AddVertexBuffer` 再把它翻译成 `glVertexAttribPointer`——把手动数字节的活自动化。
+- **RAII 封装 GPU 资源**：每个 OpenGL 对象（VBO/VAO/Program）的句柄存在 `m_rendererID`，构造时创建、析构时删除。
+
+### 一次 DrawIndexed 的数据流
+
+```
+SandboxApp（只用 RHI 接口，无一句 gl*）
+  → VertexArray::Create()  → OpenGLVertexArray（glCreateVertexArrays）
+  → VertexBuffer::Create() + SetLayout()  → BufferLayout 算好 offset/stride
+  → AddVertexBuffer()  → glVertexAttribPointer 逐属性配置
+  → Shader::Create()  → 编译链接 GLSL program
+  → 每帧 Clear() + shader->Bind() + DrawIndexed()  → glDrawElements
+```
 
 ---
 

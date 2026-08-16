@@ -11,18 +11,22 @@ add_library(SeedEngine STATIC
     src/Renderer/Renderer.cpp
     src/Renderer/PerspectiveCamera.cpp
     src/Renderer/CameraController.cpp
+    src/Renderer/Mesh.cpp
+    src/Renderer/Model.cpp
 
     # RHI 抽象层工厂
     src/RHI/RenderAPI.cpp
     src/RHI/Buffer.cpp
     src/RHI/VertexArray.cpp
     src/RHI/Shader.cpp
+    src/RHI/Texture.cpp
 
     # RHI OpenGL 后端
     src/RHI/OpenGL/OpenGLRenderAPI.cpp
     src/RHI/OpenGL/OpenGLBuffer.cpp
     src/RHI/OpenGL/OpenGLVertexArray.cpp
     src/RHI/OpenGL/OpenGLShader.cpp
+    src/RHI/OpenGL/OpenGLTexture.cpp
 )
 
 # 现代 CMake 别名：客户端用 Seed::Engine 链接
@@ -49,4 +53,6 @@ target_link_libraries(SeedEngine
     PRIVATE
         glfw
         glad
+        stb_image
+        assimp
 )

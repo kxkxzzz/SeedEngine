@@ -3,7 +3,7 @@
 > 本文档记录引擎的结构、各文件作用、运行时数据流与关键设计取舍。
 > 随代码演进持续维护——每完成一个阶段（见 [ROADMAP.md](../ROADMAP.md)）就更新对应章节。
 >
-> 当前进度：**阶段 F 完成**（Renderer + PerspectiveCamera + CameraController，FPS 飞行相机看 3D 立方体）。
+> 当前进度：**阶段 G 完成**（Mesh + Texture2D + assimp 模型加载，FPS 飞行相机看带贴图的 3D 模型）。
 
 ---
 
@@ -43,10 +43,13 @@ SeedEngine/
 │   │   │   └── MouseCode.h     # 引擎鼠标按键码
 │   │   ├── Events/              # Event 基类 + Window/Key/Mouse 具体事件
 │   │   ├── RHI/                 # 渲染硬件接口抽象（见第 8 节）
+│   │   │   └── Texture.h            # Texture/Texture2D 抽象 + 工厂（阶段 G）
 │   │   └── Renderer/
 │   │       ├── PerspectiveCamera.h  # 透视相机：view/projection 矩阵
 │   │       ├── Renderer.h           # BeginScene/Submit/EndScene
-│   │       └── CameraController.h   # FPS 飞行相机控制器
+│   │       ├── CameraController.h   # FPS 飞行相机控制器
+│   │       ├── Mesh.h                # Vertex/MeshTexture/Mesh（阶段 G）
+│   │       └── Model.h               # assimp 模型加载器（阶段 G）
 │   └── src/                # 私有实现：客户端看不到
 │       ├── Core/
 │       │   ├── Application.cpp
@@ -58,18 +61,23 @@ SeedEngine/
 │       ├── Renderer/
 │       │   ├── Renderer.cpp
 │       │   ├── PerspectiveCamera.cpp
-│       │   └── CameraController.cpp
-│       └── RHI/                    # OpenGL 后端实现（见第 8 节）
+│       │   ├── CameraController.cpp
+│       │   ├── Mesh.cpp             # 建 VertexArray + 绑贴图 + Renderer::Submit（阶段 G）
+│       │   └── Model.cpp            # assimp 递归解析场景 → Mesh 列表（阶段 G）
+│       └── RHI/                    # OpenGL 后端实现（见第 8 节），含 OpenGL/OpenGLTexture.h/.cpp（阶段 G）
 │
 ├── Sandbox/                # 客户端测试程序 → 可执行 Sandbox
 │   ├── CMakeLists.txt
+│   ├── assets/models/       # 测试模型资产（如 BoxTextured，CC-BY 4.0）
 │   └── src/SandboxApp.cpp
 │
 └── ThirdParty/            # 第三方依赖
     ├── glfw   (submodule, 3.4)     # 窗口/输入
     ├── glm    (submodule, 1.0.1)   # 数学
     ├── spdlog (submodule, 1.15.1)  # 日志
-    └── glad   (本地生成, GL 4.6)    # OpenGL 函数加载
+    ├── glad   (本地生成, GL 4.6)    # OpenGL 函数加载
+    ├── stb    (submodule)          # stb_image.h，解码图片
+    └── assimp (submodule, v6.0.5)  # 解析 .obj/.gltf 等模型格式
 ```
 
 **核心划分**：`include/` 是"别人调用引擎时需要的东西"，`src/` 是"实现细节，别人不该碰也碰不到"。
@@ -186,13 +194,13 @@ SeedEngine/
    └──────────────────────────────────────────────────┘
                          │
                          ▼
-         ThirdParty: glfw / glad / glm / spdlog
+         ThirdParty: glfw / glad / glm / spdlog / stb / assimp
 ```
 
 **核心原则**：依赖永远指向抽象，而非具体。要换成 SDL，只需加 `SDLWindow.cpp`，`Application` 一行不改。
 
 **CMake 依赖可见性**：
-- glfw / glad → `PRIVATE`（客户端不该直接看到）
+- glfw / glad / stb_image / assimp → `PRIVATE`（客户端不该直接看到）
 - glm / spdlog → `PUBLIC`（后续公开头会用到数学类型和日志）
 
 ---
@@ -255,7 +263,7 @@ SeedEngine/
 |---|---|
 | glfwGetTime() 直接在 Application 里调用 | 后续换成平台无关的时间接口 |
 | `Renderer::Submit` 每次都全量设 uniform，无渲染队列/排序 | 后续按需扩展（当前物体数量少，非瓶颈） |
-| 立方体顶点色手写、无光照 | 阶段 G-H：Mesh/贴图/Blinn-Phong |
+| 只打通 diffuse 贴图，无光照 | 阶段 H：Blinn-Phong / PBR，用上 Mesh 已提取的法线 |
 
 这套结构的好处：每个后续阶段都是往骨架里"填肉"，不用再动骨架。
 
@@ -336,6 +344,55 @@ SandboxApp（只用 RHI 接口，无一句 gl*）
 - `m_firstMouse` 标志：首次按下右键或每次松开重置，避免因鼠标位置跳变导致视角"猛转一下"。
 - `pitch` 限制在 `[-89°, 89°]`：防止到 90° 时 `forward` 与 `worldUp` 平行，叉乘退化为零向量。
 - `OnEvent` 里用 `EventDispatcher` 监听 `WindowResizeEvent`，同步更新相机宽高比；返回 `false` 表示不消费事件（其他 Layer 可能也关心 resize）。
+
+---
+
+## 10. Mesh 与模型加载（阶段 G）
+
+把手写立方体顶点换成真实模型文件：assimp 解析场景 → `Mesh` 持有 GPU 资源 → `Texture2D` 提供贴图，三者拼成一条完整的"文件到屏幕"链路。
+
+### Texture2D —— RHI 贴图（OpenGL 实现）
+
+`src/RHI/OpenGL/OpenGLTexture.cpp`，延续项目里的 DSA 风格（`glCreateBuffers`/`glCreateVertexArrays` 已是这个模式）：
+
+- `Create(path)`：`stbi_load` 读文件解码 → 按 channel 数选 `GL_RGB8`/`GL_RGBA8` → `glCreateTextures` + `glTextureStorage2D` + `glTextureSubImage2D` → `glGenerateTextureMipmap`。读取失败时 `SEED_CORE_ASSERT`，不静默吞错误。
+- `Bind(slot)`：`glBindTextureUnit(slot, id)`，比传统 `glActiveTexture` + `glBindTexture` 两步少一步。
+- 工厂 `Texture.cpp` 与 `Buffer.cpp`/`Shader.cpp` 完全同构：按 `RenderAPI::GetAPI()` switch 返回对应后端实现。
+
+### Mesh —— 一份可绘制的几何 + 贴图
+
+`Vertex { Position, Normal, TexCoords }`：字段顺序对应 shader 里 `layout(location = 0/1/2)`。构造时用 `VertexBuffer::Create` + `SetLayout({Float3, Float3, Float2})` + `IndexBuffer::Create` 建好 `VertexArray`——`BufferLayout` 自动算 offset/stride 的机制（第 8 节）直接复用，不用为新顶点结构手写 `glVertexAttribPointer`。
+
+`Draw()`：从 `m_textures` 里找第一个 `Type == "diffuse"` 的贴图 `Bind(0)`，设 `u_DiffuseTexture`/`u_HasTexture` 两个 uniform（无贴图时退化成固定灰色，不崩不留空洞），再调用 `Renderer::Submit`——**不重复 Renderer 已有的"设 ViewProjection/Transform + DrawIndexed"逻辑**，`Mesh` 只管贴图这一件 `Renderer::Submit` 不知道的事。
+
+法线贴图 / 多光照贴图槽（specular/normal）先不接，留给阶段 H 的光照。
+
+### Model —— assimp 加载器
+
+`Model.h` 只前向声明 `aiNode`/`aiMesh`/`aiScene`/`aiMaterial`，不 `#include <assimp/...>`——与 `GLFWWindow.h` 前向声明 `GLFWwindow` 同样的做法，公开头不拖第三方依赖。`LoadMaterialTextures` 的纹理类型参数用 `int` 而非 `aiTextureType`，避免头文件依赖 assimp 的枚举定义。
+
+加载流程（`Model.cpp`）：
+
+```
+Assimp::Importer::ReadFile(path, Triangulate | GenSmoothNormals | FlipUVs)
+  → ProcessNode(root)  递归遍历场景节点
+       └─ ProcessMesh(aiMesh)
+            ├─ 提取 position / normal / texcoord（mTextureCoords[0] 判空）→ vector<Vertex>
+            ├─ 展开 mFaces[i].mIndices → vector<uint32_t>
+            └─ 材质贴图：先试 aiTextureType_DIFFUSE，为空再试 aiTextureType_BASE_COLOR
+                （传统 OBJ/FBX 用前者，glTF PBR 材质在 assimp 里映射到后者）
+                贴图路径 = m_directory + "/" + 文件名，按路径存进 m_loadedTextures 去重，
+                避免同一张贴图（如多个 Mesh 共用同一贴图）被重复解码、重复传 GPU
+  → 每个 aiMesh 对应一个 seed::Mesh，汇总进 m_meshes
+```
+
+`Model::Draw()` 只是遍历 `m_meshes` 逐个调用 `Mesh::Draw`——`Model` 本身不碰任何 GPU 状态。
+
+### 测试资产与验收
+
+Sandbox 用 Khronos 官方 [glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) 的 `BoxTextured`（CC-BY 4.0，署名 Cesium，见 `Sandbox/assets/models/BoxTextured/LICENSE.md`），选分体文件版（`.gltf` + `.bin` + `.png`）而非单文件 `.glb`——因为分体版的纹理引用是外部文件路径，走标准 `Texture2D::Create(path)` 即可，不需要额外实现从内存解码贴图（`stbi_load_from_memory`）的路径。
+
+验收：`SandboxApp` 用 `Model` 替换手写立方体顶点，运行 `./out/bin/Sandbox.exe` 可见一个贴着 Cesium 贴图的立方体持续自转，日志打印 `模型加载完成: ... (1 个 Mesh)`。
 
 ---
 

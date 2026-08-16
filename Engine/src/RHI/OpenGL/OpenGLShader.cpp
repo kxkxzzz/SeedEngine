@@ -73,6 +73,10 @@ void OpenGLShader::SetMat4(const std::string& name, const glm::mat4& value) {
     glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
 }
 
+void OpenGLShader::SetMat3(const std::string& name, const glm::mat3& value) {
+    glUniformMatrix3fv(GetUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
+}
+
 // ---- 辅助函数 ----
 
 std::string OpenGLShader::ReadFile(const std::string& filepath) {

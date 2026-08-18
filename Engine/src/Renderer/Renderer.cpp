@@ -25,10 +25,15 @@ void Renderer::Clear() {
 
 void Renderer::BeginScene(const PerspectiveCamera& camera) {
     s_sceneData->ViewProjectionMatrix = camera.GetViewProjectionMatrix();
+    s_sceneData->CameraPosition = camera.GetPosition();
 }
 
 void Renderer::EndScene() {
     // 留空
+}
+
+void Renderer::SetDirectionalLight(const DirectionalLight& light) {
+    s_sceneData->DirLight = light;
 }
 
 void Renderer::Submit(const std::shared_ptr<Shader>& shader,
@@ -36,6 +41,7 @@ void Renderer::Submit(const std::shared_ptr<Shader>& shader,
     shader->Bind();
     shader->SetMat4("u_ViewProjection", s_sceneData->ViewProjectionMatrix);
     shader->SetMat4("u_Transform", transform);
+    shader->SetFloat3("u_CameraPosition", s_sceneData->CameraPosition);
 
     vertexArray->Bind();
     s_renderAPI->DrawIndexed(vertexArray);

@@ -22,7 +22,8 @@ void Model::Draw(const std::shared_ptr<Shader>& shader, const glm::mat4& transfo
 void Model::LoadModel(const std::string& path) {
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(
-        path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs);
+        path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs
+              | aiProcess_CalcTangentSpace);
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         SEED_CORE_ASSERT(false, "assimp 加载模型失败: {} ({})", path, importer.GetErrorString());
@@ -58,6 +59,9 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene) {
         vertex.TexCoords = mesh->mTextureCoords[0]
                                 ? glm::vec2{mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y}
                                 : glm::vec2{0.0f, 0.0f};
+        vertex.Tangent = mesh->HasTangentsAndBitangents()
+                              ? glm::vec3{mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z}
+                              : glm::vec3{0.0f, 0.0f, 0.0f};
         vertices.push_back(vertex);
     }
 

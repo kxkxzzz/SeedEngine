@@ -8,6 +8,7 @@
 #include "Seed/RHI/RenderAPI.h"
 #include "Seed/RHI/Shader.h"
 #include "Seed/RHI/VertexArray.h"
+#include "Seed/Renderer/Light.h"
 #include "Seed/Renderer/PerspectiveCamera.h"
 
 namespace seed {
@@ -28,17 +29,25 @@ public:
     static void BeginScene(const PerspectiveCamera& camera);
     static void EndScene();
 
+    // 设置场景光源（在 BeginScene 前或后调用）
+    static void SetDirectionalLight(const DirectionalLight& light);
+
     // 提交一个物体：绑定 shader，传入 VP 矩阵和物体自身的 transform，再绘制
     static void Submit(const std::shared_ptr<Shader>& shader,
                        const std::shared_ptr<VertexArray>& vertexArray,
                        const glm::mat4& transform = glm::mat4(1.0f));
 
-private:
     // 跨 BeginScene/Submit 共享的帧内数据
     struct SceneData {
         glm::mat4 ViewProjectionMatrix{1.0f};
+        glm::vec3 CameraPosition{0.0f, 0.0f, 0.0f};
+        DirectionalLight DirLight;
     };
 
+    // 暴露给 Mesh::Draw 读取光源/相机
+    static const SceneData* GetSceneData() { return s_sceneData; }
+
+private:
     static SceneData* s_sceneData;
     static std::unique_ptr<RenderAPI> s_renderAPI;
 };

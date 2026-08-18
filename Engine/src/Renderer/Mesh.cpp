@@ -82,13 +82,12 @@ void Mesh::Draw(const std::shared_ptr<Shader>& shader, const glm::mat4& transfor
     shader->SetFloat3("u_Material_Specular", materialSpecular);
     shader->SetFloat("u_Material_Shininess", materialShininess);
 
-    // TODO: 设置光源 uniform（暂时硬编码，等 Renderer::SceneData 扩展后改）
-    shader->SetFloat3("u_DirLight_Direction", glm::vec3(0.0f, -1.0f, -0.3f));
-    shader->SetFloat3("u_DirLight_Color", glm::vec3(1.0f));
-    shader->SetFloat("u_DirLight_Intensity", 1.0f);
-
-    // TODO: 设置相机位置（暂时硬编码，等 Renderer::SceneData 扩展后改）
-    shader->SetFloat3("u_ViewPos", glm::vec3(0.0f, 0.0f, 3.0f));
+    // 从 Renderer::SceneData 读取光源和相机位置
+    const auto* sceneData = Renderer::GetSceneData();
+    shader->SetFloat3("u_DirLight_Direction", sceneData->DirLight.Direction);
+    shader->SetFloat3("u_DirLight_Color", sceneData->DirLight.Color);
+    shader->SetFloat("u_DirLight_Intensity", sceneData->DirLight.Intensity);
+    shader->SetFloat3("u_ViewPos", sceneData->CameraPosition);
 
     // 计算并设置法线变换矩阵
     glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));

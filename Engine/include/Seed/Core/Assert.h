@@ -3,12 +3,11 @@
 
 #include "Seed/Core/Log.h"
 
-// 调试中断：clang-cl / MSVC 用 __debugbreak，其它平台回退到 SIGTRAP
+// 调试中断：MSVC 用 __debugbreak，GCC/Clang 用 __builtin_trap
 #if defined(_MSC_VER)
     #define SEED_DEBUGBREAK() __debugbreak()
-#elif defined(__clang__) || defined(__GNUC__)
-    #include <csignal>
-    #define SEED_DEBUGBREAK() raise(SIGTRAP)
+#elif defined(__GNUC__) || defined(__clang__)
+    #define SEED_DEBUGBREAK() __builtin_trap()
 #else
     #define SEED_DEBUGBREAK()
 #endif

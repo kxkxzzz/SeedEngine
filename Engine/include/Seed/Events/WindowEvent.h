@@ -1,6 +1,7 @@
 // WindowEvent.h —— 窗口相关事件
 #pragma once
 
+#include <cstdint>
 #include "Seed/Events/Event.h"
 
 namespace seed {

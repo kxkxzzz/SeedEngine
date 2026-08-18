@@ -10,6 +10,7 @@
 #include <Seed/Core/TimeStep.h>
 #include <Seed/RHI/Shader.h>
 #include <Seed/Renderer/CameraController.h>
+#include <Seed/Renderer/Light.h>
 #include <Seed/Renderer/Model.h>
 #include <Seed/Renderer/Renderer.h>
 
@@ -22,41 +23,7 @@ public:
 
     void OnAttach() override {
         m_model = std::make_unique<Model>("Sandbox/assets/models/BoxTextured/BoxTextured.gltf");
-
-        std::string vertexSrc = R"(
-            #version 450 core
-            layout(location = 0) in vec3 a_Position;
-            layout(location = 1) in vec3 a_Normal;
-            layout(location = 2) in vec2 a_TexCoords;
-
-            uniform mat4 u_ViewProjection;
-            uniform mat4 u_Transform;
-
-            out vec2 v_TexCoords;
-
-            void main() {
-                v_TexCoords = a_TexCoords;
-                gl_Position = u_ViewProjection * u_Transform * vec4(a_Position, 1.0);
-            }
-        )";
-
-        std::string fragmentSrc = R"(
-            #version 450 core
-            in vec2 v_TexCoords;
-            out vec4 color;
-
-            uniform sampler2D u_DiffuseTexture;
-            uniform int u_HasTexture;
-
-            void main() {
-                if (u_HasTexture == 1)
-                    color = texture(u_DiffuseTexture, v_TexCoords);
-                else
-                    color = vec4(0.6, 0.6, 0.6, 1.0);
-            }
-        )";
-
-        m_shader = Shader::Create("TexturedMesh", vertexSrc, fragmentSrc);
+        m_shader = Shader::Create("Sandbox/assets/shaders/BlinnPhong.glsl");
 
         SEED_INFO("ExampleLayer 模型资源已就绪");
     }
@@ -67,12 +34,20 @@ public:
         Renderer::SetClearColor({0.1f, 0.15f, 0.2f, 1.0f});
         Renderer::Clear();
 
+        // 设置场景光源
+        DirectionalLight light;
+        light.Direction = glm::vec3(0.3f, -1.0f, -0.5f);
+        light.Color = glm::vec3(1.0f, 0.95f, 0.85f);
+        light.Intensity = 1.2f;
+        Renderer::SetDirectionalLight(light);
+
+        Renderer::BeginScene(m_cameraController.GetCamera());
+
         // 让模型自转，便于观察 3D 效果与贴图
         m_rotation += ts.GetSeconds() * 30.0f;  // 每秒转 30 度
         glm::mat4 transform =
             glm::rotate(glm::mat4(1.0f), glm::radians(m_rotation), glm::vec3(0.5f, 1.0f, 0.0f));
 
-        Renderer::BeginScene(m_cameraController.GetCamera());
         m_model->Draw(m_shader, transform);
         Renderer::EndScene();
     }

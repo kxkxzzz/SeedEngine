@@ -27,8 +27,9 @@ public:
 
 private:
     void LoadModel(const std::string& path);
-    void ProcessNode(aiNode* node, const aiScene* scene);
-    Mesh ProcessMesh(aiMesh* mesh, const aiScene* scene);
+    // parentTransform 沿节点层级累乘，把各节点的局部变换烘进顶点
+    void ProcessNode(aiNode* node, const aiScene* scene, const glm::mat4& parentTransform);
+    Mesh ProcessMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& transform);
     // textureType 对应 aiTextureType，这里用 int 是为了不在头文件里 include assimp 的枚举
     std::vector<MeshTexture> LoadMaterialTextures(aiMaterial* material, int textureType,
                                                   const std::string& typeName);

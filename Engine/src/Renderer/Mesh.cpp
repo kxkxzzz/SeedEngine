@@ -29,71 +29,15 @@ Mesh::Mesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices,
 void Mesh::Draw(const std::shared_ptr<Shader>& shader, const glm::mat4& transform) const {
     shader->Bind();
 
-    // TODO 9 简化版：硬编码材质参数（后续改成从外部传入）
-    glm::vec3 materialAmbient{0.2f};
-    glm::vec3 materialDiffuse{0.8f};
-    glm::vec3 materialSpecular{0.5f};
-    float materialShininess = 32.0f;
-
-    // 从 m_textures 找 diffuse/specular/normal 贴图
-    const MeshTexture* diffuse = nullptr;
-    const MeshTexture* specular = nullptr;
-    const MeshTexture* normal = nullptr;
-    for (const auto& texture : m_textures) {
-        if (texture.Type == "diffuse")
-            diffuse = &texture;
-        else if (texture.Type == "specular")
-            specular = &texture;
-        else if (texture.Type == "normal")
-            normal = &texture;
-    }
-
-    // 绑定贴图到对应槽位
-    if (diffuse) {
-        diffuse->TextureRef->Bind(0);
-        shader->SetInt("u_Material_DiffuseMap", 0);
-        shader->SetInt("u_Material_HasDiffuseMap", 1);
-    }
-    else {
-        shader->SetInt("u_Material_HasDiffuseMap", 0);
-    }
-
-    if (specular) {
-        specular->TextureRef->Bind(1);
-        shader->SetInt("u_Material_SpecularMap", 1);
-        shader->SetInt("u_Material_HasSpecularMap", 1);
-    }
-    else {
-        shader->SetInt("u_Material_HasSpecularMap", 0);
-    }
-
-    if (normal) {
-        normal->TextureRef->Bind(2);
-        shader->SetInt("u_Material_NormalMap", 2);
-        shader->SetInt("u_Material_HasNormalMap", 1);
-    }
-    else {
-        shader->SetInt("u_Material_HasNormalMap", 0);
-    }
-
-    // 设置材质参数 uniform
-    shader->SetFloat3("u_Material_Ambient", materialAmbient);
-    shader->SetFloat3("u_Material_Diffuse", materialDiffuse);
-    shader->SetFloat3("u_Material_Specular", materialSpecular);
-    shader->SetFloat("u_Material_Shininess", materialShininess);
-
-    // 从 Renderer::SceneData 读取光源和相机位置
-    const auto* sceneData = Renderer::GetSceneData();
-    shader->SetFloat3("u_DirLight_Direction", sceneData->DirLight.Direction);
-    shader->SetFloat3("u_DirLight_Color", sceneData->DirLight.Color);
-    shader->SetFloat("u_DirLight_Intensity", sceneData->DirLight.Intensity);
-    shader->SetFloat3("u_ViewPos", sceneData->CameraPosition);
-
-    // 计算并设置法线变换矩阵
+    // 法线矩阵：非均匀缩放下法线不能直接乘 model 矩阵，否则不再垂直于表面
     glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
     shader->SetMat3("u_NormalMatrix", normalMatrix);
 
+    // 材质与光源由调用方负责设置（见 PBRMaterial::Bind）：
+    // Mesh 只管几何和变换，不绑定任何材质 uniform，
+    // 这样同一份网格能配任意 shader（PBR / Blinn-Phong / 纯色调试）
     Renderer::Submit(shader, m_vertexArray, transform);
 }
+
 
 }  // namespace seed

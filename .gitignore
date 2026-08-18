@@ -1,6 +1,13 @@
 build/
 out/
+
+# 美术资源体积大，不入库：五套 2K PBR 材质 + HDR 环境图约数百 MB
+# 下载地址见 readme
+Sandbox/assets/textures/
+Sandbox/assets/hdri/
 .vscode/
 .cache/
 .idea/
 ROADMAP.md
+Sandbox/assets/
+docs/

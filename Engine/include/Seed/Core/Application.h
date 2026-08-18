@@ -31,6 +31,7 @@ public:
 
 private:
     bool OnWindowClose(WindowCloseEvent& e);
+    bool OnWindowResize(WindowResizeEvent& e);
 
     std::unique_ptr<Window> m_window;
     LayerStack m_layerStack;

@@ -13,6 +13,9 @@ add_library(SeedEngine STATIC
     src/Renderer/CameraController.cpp
     src/Renderer/Mesh.cpp
     src/Renderer/Model.cpp
+    src/Renderer/IBLBaker.cpp
+    src/Renderer/Skybox.cpp
+    src/Renderer/PBRMaterial.cpp
 
     # RHI 抽象层工厂
     src/RHI/RenderAPI.cpp
@@ -20,6 +23,7 @@ add_library(SeedEngine STATIC
     src/RHI/VertexArray.cpp
     src/RHI/Shader.cpp
     src/RHI/Texture.cpp
+    src/RHI/Framebuffer.cpp
 
     # RHI OpenGL 后端
     src/RHI/OpenGL/OpenGLRenderAPI.cpp
@@ -27,6 +31,7 @@ add_library(SeedEngine STATIC
     src/RHI/OpenGL/OpenGLVertexArray.cpp
     src/RHI/OpenGL/OpenGLShader.cpp
     src/RHI/OpenGL/OpenGLTexture.cpp
+    src/RHI/OpenGL/OpenGLFramebuffer.cpp
 )
 
 # 现代 CMake 别名：客户端用 Seed::Engine 链接

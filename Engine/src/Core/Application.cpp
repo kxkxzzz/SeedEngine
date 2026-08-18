@@ -1,6 +1,7 @@
 // Application.cpp
 #include "Seed/Core/Application.h"
 
+#include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
 #include "Seed/Core/Log.h"
@@ -46,6 +47,9 @@ void Application::Run() {
         Timestep ts = time - m_lastFrameTime;
         m_lastFrameTime = time;
 
+        // 每帧把视口重置回窗口尺寸：离屏渲染（IBL 预计算/阴影/后处理）会改视口且不负责恢复
+        glViewport(0, 0, m_window->GetWidth(), m_window->GetHeight());
+
         // 清屏与绘制都交给 Layer 通过 RHI 完成
         for (auto* layer : m_layerStack)
             layer->OnUpdate(ts);
@@ -59,6 +63,7 @@ void Application::Run() {
 void Application::OnEvent(Event& e) {
     EventDispatcher dispatcher(e);
     dispatcher.Dispatch<WindowCloseEvent>(SEED_BIND_EVENT_FN(Application::OnWindowClose));
+    dispatcher.Dispatch<WindowResizeEvent>(SEED_BIND_EVENT_FN(Application::OnWindowResize));
 
     // 从栈顶向下分发，某层处理后设 Handled=true 则停止传递
     for (auto it = m_layerStack.rbegin(); it != m_layerStack.rend(); ++it) {
@@ -71,6 +76,12 @@ void Application::OnEvent(Event& e) {
 bool Application::OnWindowClose(WindowCloseEvent& /*e*/) {
     m_running = false;
     return true;
+}
+
+bool Application::OnWindowResize(WindowResizeEvent& e) {
+    // 更新 OpenGL 视口
+    glViewport(0, 0, e.GetWidth(), e.GetHeight());
+    return false;
 }
 
 }  // namespace seed

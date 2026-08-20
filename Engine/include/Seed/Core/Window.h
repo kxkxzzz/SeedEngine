@@ -21,6 +21,10 @@ struct WindowCreateInfo {
     bool resizable = true;
     bool fullscreen = false;
 
+    // 默认帧缓冲的 MSAA 采样数，1 表示关闭。只影响几何边缘的锯齿，
+    // 贴图闪烁靠 mipmap 解决，高光闪烁靠 shader 里的 specular AA 解决
+    uint32_t samples = 4;
+
     // 无窗口模式：用于 Vulkan/D3D12/Metal，不创建 OpenGL 上下文
     bool headless = false;
 };

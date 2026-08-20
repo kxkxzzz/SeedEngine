@@ -35,7 +35,6 @@ private:
     static constexpr const char* kSphereModelPath = "Sandbox/assets/models/Sphere/sphere.obj";
 
 public:
-
     void OnAttach() override {
         // 球体是展示 PBR 最好的形状：法线连续变化，能一眼看到菲涅尔和高光的完整分布
         m_model = std::make_unique<Model>(kSphereModelPath);
@@ -48,7 +47,7 @@ public:
 
         // IBL 预计算：环境图开到 2K 让 skybox 更锐利，
         // 辐照度/预过滤图保持默认（它们是卷积结果，调大只会变慢不会更准）
-        m_iblSpec.EnvironmentResolution = 2048;
+        m_iblSpec.EnvironmentResolution = 512;
         m_iblTextures =
             IBLBaker::BakeFromHDR("Sandbox/assets/hdri/cowboy_town_saloon_2k.hdr", m_iblSpec);
         m_useIBL = true;
@@ -126,8 +125,8 @@ public:
             if (key >= Key::D0 && key <= Key::D5) {
                 m_debugMode = key - Key::D0;
                 static const char* names[] = {
-                    "正常", "prefilteredColor", "BRDF LUT", "irradiance", "specular_IBL",
-                    "prefilter(mip0)",
+                    "正常",       "prefilteredColor", "BRDF LUT",
+                    "irradiance", "specular_IBL",     "prefilter(mip0)",
                 };
                 SEED_INFO("调试通道 {} = {}", m_debugMode, names[m_debugMode]);
             }

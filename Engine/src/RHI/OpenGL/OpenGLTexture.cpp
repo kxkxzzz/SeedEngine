@@ -70,10 +70,23 @@ OpenGLTexture2D::OpenGLTexture2D(const std::string& path, TextureFormat format) 
 
     m_dataFormat = (channels == 4) ? GL_RGBA : (channels == 3) ? GL_RGB : GL_RED;
 
-    glCreateTextures(GL_TEXTURE_2D, 1, &m_rendererID);
-    glTextureStorage2D(m_rendererID, 1, m_internalFormat, m_width, m_height);
+    // HDR 环境图是 equirectangular 全景，只被 IBL 烘焙一次性采样，不需要 mip 链；
+    // 材质贴图会以任意缩放贴在网格上，缺 mipmap 会在缩小处严重走样
+    m_mipLevels = 1;
+    if (!isHDR) {
+        uint32_t size = (m_width > m_height) ? m_width : m_height;
+        while (size > 1) {
+            size >>= 1;
+            ++m_mipLevels;
+        }
+    }
 
-    glTextureParameteri(m_rendererID, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glCreateTextures(GL_TEXTURE_2D, 1, &m_rendererID);
+    glTextureStorage2D(m_rendererID, m_mipLevels, m_internalFormat, m_width, m_height);
+
+    // 缩小时用三线性过滤（mip 内 + mip 间都插值），放大时双线性
+    glTextureParameteri(m_rendererID, GL_TEXTURE_MIN_FILTER,
+                        m_mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
     glTextureParameteri(m_rendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(m_rendererID, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTextureParameteri(m_rendererID, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -85,6 +98,20 @@ OpenGLTexture2D::OpenGLTexture2D(const std::string& path, TextureFormat format) 
     else {
         glTextureSubImage2D(m_rendererID, 0, 0, 0, m_width, m_height, m_dataFormat, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
+    }
+
+    if (m_mipLevels > 1) {
+        // mip 链要在像素上传之后生成，否则下采样的是未初始化的内容。
+        // sRGB 纹理的下采样由驱动在线性空间做，不会有 gamma 偏差
+        glGenerateTextureMipmap(m_rendererID);
+
+        // 各向异性过滤：球面/地板这类以掠射角看过去的表面，各向同性的三线性
+        // 会沿压缩方向过度模糊，AF 沿该方向多取几个样本，兼顾清晰与抗闪
+        GLfloat maxAniso = 1.0f;
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maxAniso);
+        if (maxAniso > 1.0f)
+            glTextureParameterf(m_rendererID, GL_TEXTURE_MAX_ANISOTROPY,
+                                maxAniso < 8.0f ? maxAniso : 8.0f);
     }
 }
 
@@ -128,6 +155,10 @@ void OpenGLTexture2D::SetData(void* data, uint32_t size) {
     }
     SEED_CORE_ASSERT(size == m_width * m_height * bytesPerPixel, "SetData 的数据大小与贴图尺寸不匹配");
     glTextureSubImage2D(m_rendererID, 0, 0, 0, m_width, m_height, m_dataFormat, m_dataType, data);
+
+    // 只写了 mip 0，有 mip 链时其余各级会残留旧内容，缩小采样时就会采到过期像素
+    if (m_mipLevels > 1)
+        glGenerateTextureMipmap(m_rendererID);
 }
 
 // ========== TextureCube ==========

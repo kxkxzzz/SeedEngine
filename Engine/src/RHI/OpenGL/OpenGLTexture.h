@@ -31,6 +31,7 @@ private:
     uint32_t m_internalFormat = 0;
     uint32_t m_dataFormat = 0;
     uint32_t m_dataType = 0;  // GL_UNSIGNED_BYTE 或 GL_FLOAT
+    uint32_t m_mipLevels = 1;  // 1 表示无 mip 链（HDR 环境图、离屏渲染目标）
 };
 
 class OpenGLTextureCube : public TextureCube {

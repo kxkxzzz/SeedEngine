@@ -125,6 +125,11 @@ void GLFWWindow::SetupWindowHints(const WindowCreateInfo& info) {
     }
 
     glfwWindowHint(GLFW_RESIZABLE, info.resizable ? GLFW_TRUE : GLFW_FALSE);
+
+    // MSAA 必须在创建窗口前作为 hint 给出：默认帧缓冲的采样数由像素格式决定，
+    // 上下文建好之后无法再改。headless 模式没有默认帧缓冲，跳过
+    if (!info.headless && info.samples > 1)
+        glfwWindowHint(GLFW_SAMPLES, static_cast<int>(info.samples));
 }
 
 void GLFWWindow::SetupCallbacks() {
